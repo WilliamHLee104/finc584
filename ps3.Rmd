@@ -6,7 +6,6 @@ date: "`r format(Sys.time(), '%d %B, %Y')`"
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_chunk$set(cache.extra = rand_seed)
 
 xfun::pkg_attach2('tidyverse', 'modelsummary', 'knitr')
 
@@ -85,28 +84,79 @@ kable(data.frame(beta_hat_1 = c(beta_conventional_se, beta_robust_se,
 
 ```
 
-The results are pretty much what I expected. All three standard errors are roughly similar. The robust standard errors are larger than the conventional OLS estimators which is expected. The bootstrap method is right in the middle of the other two methods in terms of efficiency.
+The results are pretty much what I expected. All three standard errors are roughly similar. The robust standard errors are larger than the conventional OLS estimators which is expected. The bootstrap method is similar to the other two methods in terms of efficiency. 
 
 ## Problem 1C
 
 ```{r 1c}
 
 confidence_interval <- function(b, b_se){
-  return((b - beta_conventional_full)/b_se < 1.96)
+  return( abs((b - beta_conventional_full[2]))/b_se < 1.96)
 }
 
-problem1c <- function(n){
-  mc_sample <- ak_full[sample(1:nrow(ak_full), n, replace = T),]
+conventional_method <- function(x,y){
+
+  beta_conventional <- solve(t(x) %*% x)%*%(t(x)%*%y)
+  resid <- y - x %*% beta_conventional
+
+  ## Compute SEs for conventional method
+  beta_conventional_se <- sqrt(diag(mean(resid^2) * (solve(t(x) %*% x))))[2]
+  
+  return(confidence_interval(beta_conventional[2], beta_conventional_se))
+}
+
+robust_method <- function(x,y){
+  
+  beta_conventional <- solve(t(x) %*% x)%*%(t(x)%*%y)
+  resid <- y - x %*% beta_conventional
+  
+  ## Compute SEs for robust method
+  sandwich_bread <- solve(t(x) %*% x)
+  sandwich_meat <- t(x) %*% diag(as.vector(resid)^2) %*% x
+  
+  beta_robust_se <- sqrt(diag(sandwich_bread %*% sandwich_meat %*% sandwich_bread))[2]
+  
+  return(confidence_interval(beta_conventional[2], beta_robust_se))
+
+}
+
+
+bootstrap_method <- function(data,n){
+  bootstrap_estimates <- rep(NA, 500)
+  
+  for(i in 1:length(bootstrap_estimates)){
+    bootstrap_estimates[i] <- lm(logwage ~ edu, 
+                                data = data[sample(1:nrow(ak_full), n, replace = T),])$coefficients['edu']
+  }
+
+ return(confidence_interval(mean(bootstrap_estimates), sd(bootstrap_estimates)))
+  
+}
+
+problem1c <- function(n, data){
+  
+  mc_sample <- data[sample(1:nrow(data), n, replace = T),]
   
   x <- matrix(data = c(rep(1,n), mc_sample$edu), ncol = 2)
   y <- matrix(data = mc_sample$logwage)
-    
-  # robust_test
-  # bootstrap_test
+  
+  return(data.frame(n = n, 
+                    conventional = conventional_method(x,y),
+                    robust = robust_method(x,y),
+                    bootstrap = bootstrap_method(data,n)))
 }
 
-problem1c(10)
+M <- 100
+
+results <- map_dfr(.x = c(rep(50, M), rep(100, M), rep(500, M)), .f = problem1c, data = ak_full) 
+
+results %>% group_by(n) %>% 
+  summarize_at(vars(conventional, robust, bootstrap), ~sum(.)*100/M)
+
+
 
 ```
+
+## Problem 1d
 
 
