@@ -91,7 +91,7 @@ The results are pretty much what I expected. All three standard errors are rough
 ```{r 1c}
 
 confidence_interval <- function(b, b_se){
-  return( abs((b - beta_conventional_full[2]))/b_se < 1.96)
+  return( abs((b - beta_conventional_full[2]))/b_se < qnorm(.975))
 }
 
 conventional_method <- function(x,y){
@@ -121,19 +121,22 @@ robust_method <- function(x,y){
 }
 
 
-bootstrap_method <- function(data,n){
-  bootstrap_estimates <- rep(NA, 500)
+bootstrap_method <- function(data,n,m){
+  bootstrap_estimates <- rep(NA, m)
   
   for(i in 1:length(bootstrap_estimates)){
     bootstrap_estimates[i] <- lm(logwage ~ edu, 
-                                data = data[sample(1:nrow(ak_full), n, replace = T),])$coefficients['edu']
+                                data = data[sample(1:n, n, replace = T),])$coefficients['edu']
   }
+
+ # return((mean(bootstrap_estimates) - beta_conventional_full[2])/sd(bootstrap_estimates))  
 
  return(confidence_interval(mean(bootstrap_estimates), sd(bootstrap_estimates)))
   
 }
 
-problem1c <- function(n, data){
+
+problem1c <- function(n, m, data){
   
   mc_sample <- data[sample(1:nrow(data), n, replace = T),]
   
@@ -143,15 +146,16 @@ problem1c <- function(n, data){
   return(data.frame(n = n, 
                     conventional = conventional_method(x,y),
                     robust = robust_method(x,y),
-                    bootstrap = bootstrap_method(data,n)))
+                    bootstrap = bootstrap_method(mc_sample,n,m)
+                    ))
 }
 
-M <- 100
+iter <- 5000
 
-results <- map_dfr(.x = c(rep(50, M), rep(100, M), rep(500, M)), .f = problem1c, data = ak_full) 
+results <- map_dfr(.x = c(rep(50, iter), rep(100, iter), rep(500, iter)), .f = problem1c, data = ak_full, m = 50) 
 
 results %>% group_by(n) %>% 
-  summarize_at(vars(conventional, robust, bootstrap), ~sum(.)*100/M)
+  summarize_all( ~sum(.)*100/iter)
 
 
 
@@ -159,4 +163,27 @@ results %>% group_by(n) %>%
 
 ## Problem 1d
 
+
+$$ h(\hat{\beta}) = e^{\hat{\beta}_0 + 9\hat{\beta}_1}e^{\frac{\sigma^2}{2}} - e^{\hat{\beta}_0 + 9\hat{\beta}_1}e^{\frac{\sigma^2}{2}} $$
+$$ h(\hat{\beta}) = e^{\frac{\sigma^2}{2}} \left( e^{\hat{\beta}_0 + 9\hat{\beta}_1} - e^{\hat{\beta}_0 + 8\hat{\beta}_1}\right)$$
+Thus, 
+$$ \triangledown h(\hat{\beta}) = \left(0, e^{\frac{\sigma^2}{2}}\left( 9e^{\hat{\beta}_0 + 9\hat{\beta}_1} - 8e^{\hat{\beta}_0 + 8\hat{\beta}_1} \right)\right)$$
+
+By the delta method, we have that $$\sqrt(n)(h(\hat{\beta}) - h(\beta)) \rightarrow^{D} N\left(0, \triangledown h(\hat{\beta}) * \Sigma * \triangledown (h(\hat{\beta})^T\right)$$
+
+```{r p1d}
+
+e_sigma <- exp(sigma2_hat_full/2)
+b0 <- beta_conventional_full[1]
+b1 <- beta_conventional_full[2]
+
+del_h <- matrix(c(0, e_sigma*(9*exp(b0 + 9*b1) - 8*exp(b0 + 8*b1))), ncol = 2)
+S <- sigma2_hat_full * (solve(t(x_full) %*% x_full))
+
+beta_hat_1d <- e_sigma*(exp(b0 + 9*b1) - exp(b0 + 8*b1))
+del_h %*% S %*% t(del_h)
+
+
+
+```
 
