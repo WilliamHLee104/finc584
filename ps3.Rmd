@@ -69,7 +69,7 @@ for(i in 1:length(beta_hat_bootstrap)){
 
 beta_bootstrap_se <- sd(beta_hat_bootstrap)
 
-kable(data.frame(beta_hat_1 = c(beta_conventional_se, beta_robust_se, 
+kable(data.frame(beta_hat_1_se = c(beta_conventional_se, beta_robust_se, 
                  beta_bootstrap_se), 
                  row.names = c("Conventional", "Robust", "Bootstrap")), 
       )
@@ -181,9 +181,13 @@ del_h <- matrix(c(0, e_sigma*(9*exp(b0 + 9*b1) - 8*exp(b0 + 8*b1))), ncol = 2)
 S <- sigma2_hat_full * (solve(t(x_full) %*% x_full))
 
 beta_hat_1d <- e_sigma*(exp(b0 + 9*b1) - exp(b0 + 8*b1))
-del_h %*% S %*% t(del_h)
+beta_hat_1d_se <- sqrt(del_h %*% S %*% t(del_h))
 
-
+ci_1d <- c(beta_hat_1d - qnorm(.975)*beta_hat_1d_se, beta_hat_1d + qnorm(.975)*beta_hat_1d_se)
 
 ```
+
+The resulting confidence interval is `r ci_1d`.
+
+
 
