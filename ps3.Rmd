@@ -164,10 +164,10 @@ results %>% group_by(n) %>%
 ## Problem 1d
 
 
-$$ h(\hat{\beta}) = e^{\hat{\beta}_0 + 9\hat{\beta}_1}e^{\frac{\sigma^2}{2}} - e^{\hat{\beta}_0 + 9\hat{\beta}_1}e^{\frac{\sigma^2}{2}} $$
+$$ h(\hat{\beta}) = e^{\hat{\beta}_0 + 9\hat{\beta}_1}e^{\frac{\sigma^2}{2}} - e^{\hat{\beta}_0 + 8\hat{\beta}_1}e^{\frac{\sigma^2}{2}} $$
 $$ h(\hat{\beta}) = e^{\frac{\sigma^2}{2}} \left( e^{\hat{\beta}_0 + 9\hat{\beta}_1} - e^{\hat{\beta}_0 + 8\hat{\beta}_1}\right)$$
 Thus, 
-$$ \triangledown h(\hat{\beta}) = \left(0, e^{\frac{\sigma^2}{2}}\left( 9e^{\hat{\beta}_0 + 9\hat{\beta}_1} - 8e^{\hat{\beta}_0 + 8\hat{\beta}_1} \right)\right)$$
+$$ \triangledown h(\hat{\beta}) = \left( e^{\frac{\sigma^2}{2}}\left( e^{\hat{\beta}_0 + 9\hat{\beta}_1} - e^{\hat{\beta}_0 + 8\hat{\beta}_1} \right) , e^{\frac{\sigma^2}{2}}\left( 9e^{\hat{\beta}_0 + 9\hat{\beta}_1} - 8e^{\hat{\beta}_0 + 8\hat{\beta}_1} \right)\right)$$
 
 By the delta method, we have that $$\sqrt(n)(h(\hat{\beta}) - h(\beta)) \rightarrow^{D} N\left(0, \triangledown h(\hat{\beta}) * \Sigma * \triangledown (h(\hat{\beta})^T\right)$$
 
@@ -177,7 +177,7 @@ e_sigma <- exp(sigma2_hat_full/2)
 b0 <- beta_conventional_full[1]
 b1 <- beta_conventional_full[2]
 
-del_h <- matrix(c(0, e_sigma*(9*exp(b0 + 9*b1) - 8*exp(b0 + 8*b1))), ncol = 2)
+del_h <- matrix(c(e_sigma*(exp(b0 + 9*b1) - exp(b0 + 8*b1)), e_sigma*(9*exp(b0 + 9*b1) - 8*exp(b0 + 8*b1))), ncol = 2)
 S <- sigma2_hat_full * (solve(t(x_full) %*% x_full))
 
 beta_hat_1d <- e_sigma*(exp(b0 + 9*b1) - exp(b0 + 8*b1))
@@ -185,6 +185,7 @@ beta_hat_1d_se <- sqrt(del_h %*% S %*% t(del_h))
 
 ci_1d <- c(beta_hat_1d - qnorm(.975)*beta_hat_1d_se, beta_hat_1d + qnorm(.975)*beta_hat_1d_se)
 
+ci_1d
 ```
 
 The resulting confidence interval is `r ci_1d`.
