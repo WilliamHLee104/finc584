@@ -1,0 +1,49 @@
+---
+title: "finc584_ps4"
+output: pdf_document
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+xfun::pkg_attach('tidyverse', 'readxl', 'stats')
+
+proj <- dirname(rstudioapi::getSourceEditorContext()$path)
+```
+
+```{r p1}
+stock_price <- 2838.3
+
+options <- readxl::read_xlsx(file.path(proj, 'options_07_26_2018.xlsx')) %>% 
+  select(c(1,2)) %>% 
+  rename(put_price = `put price`) %>% 
+  mutate(y = put_price/stock_price, 
+         k = log(strike) - log(stock_price))
+
+expected_payoff <- function(k, a, lambda){
+  return( a*(exp(k + lambda*k)/(lambda*(1 + lambda))))
+}
+
+
+min.rss <- function(data, param){
+  lapply(data$k, expected_payoff, a = param[1], lambda = param[2]) %>%
+  unlist() %>% 
+  as.data.frame(.) %>% rename(exp_pay = 1) %>% 
+  summarize(rss = sum((exp_pay - data$y)^2)) %>% 
+    pull()
+}
+
+
+
+optim(par = c(1,5), fn = min.rss, data = options %>% filter(k <= -0.15), 
+      hessian = T)
+
+```
+
+```{r 1c}
+
+
+
+```
+
