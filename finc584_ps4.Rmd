@@ -7,10 +7,19 @@ date: "`r format(Sys.time(), '%d %B, %Y')`"
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
-xfun::pkg_attach('tidyverse', 'readxl', 'stats')
+xfun::pkg_attach2('tidyverse', 'readxl', 'stats')
 
 proj <- dirname(rstudioapi::getSourceEditorContext()$path)
 ```
+
+## Problem 1a
+
+Multiple the density by the payoff amount to get the expected payoff. We can assume $k < \tau$ and drop all observations that don't fit this assumption. That leaves us with n = 50. 
+
+$$\frac{P_0(k)}{X_0}= \int_{-\infty}^{k} (e^k - e^r)ae^{\lambda r} dr = a\left( \frac{e^{k(1+\lambda)}}{\lambda}  - \frac{e^{k(1+\lambda)}}{1 +\lambda} \right) \\ 
+= a\frac{e^{k(1+\lambda)}}{\lambda(1+\lambda)}$$
+
+## Problem 1b
 
 ```{r p1}
 stock_price <- 2838.3
@@ -35,15 +44,93 @@ min.rss <- function(data, param){
 }
 
 
-
-optim(par = c(1,5), fn = min.rss, data = options %>% filter(k <= -0.15), 
+output <- optim(par = c(1,6), fn = min.rss, data = options %>% filter(k <= -0.15), 
       hessian = T)
 
-```
-
-```{r 1c}
-
-
+knitr::kable(cbind(c('a', 'lambda'),output$par), digits = 3)
 
 ```
+
+## Problem 1c
+
+```{r 1c, warning = F, message=F }
+
+nls_reg <- nls(y ~ a*(exp(k + lambda*k)/(lambda*(1 + lambda))) , data = options %>% filter(k < -0.15))
+
+resid <- resid(nls_reg)
+
+bread <- solve(t(nls_reg$m$gradient()) %*% nls_reg$m$gradient())
+meat <-  t(nls_reg$m$gradient()) %*% diag(resid^2)  %*% nls_reg$m$gradient()
+
+avar <- sqrt(diag(bread %*% meat %*% bread))
+
+lower.ci <- coef(nls_reg) - qnorm(.975)%*%avar 
+upper.ci <- coef(nls_reg) + qnorm(.975)%*%avar
+```
+
+The confidence interval is `r c(lower.ci[1], upper.ci[1])` for a and `r c(lower.ci[2], upper.ci[2]) ` for lambda.
+
+## Problem 1d
+
+```{r 1d}
+
+options %>% filter(k < -0.15) %>% 
+  mutate(fitted = fitted(nls_reg)) %>% 
+  ggplot(aes(x = y, y = fitted)) +
+  geom_point() + 
+  labs(title = "fitted vs actual") +
+  geom_abline(intercept = 0, slope = 1) +
+  theme_bw() +
+  theme(plot.title = element_text(hjust =0.5))
+
+```
+
+The plot above shows that the model has decent fit towards the middle but fails to accurately capture the far left tail. 
+
+## Problem 1e
+
+We will take the expression given to us in the problem, integrate it, plug in the values estimated from the last section, and then compute the variance using the delta method. 
+
+$$ \int_{-\infty}^{\tau} r^2f(r)dr = a\left(\frac{r^2e^{\lambda r}}{\lambda} + \frac{2re^{\lambda r}}{\lambda^2} + \frac{2e^{\lambda r}}{\lambda^3} \right)|_{-\infty}^{\tau}$$
+which means that the annualized VIX is 
+
+$$VIX = \sqrt{\frac{252}{22} ae^{\lambda \tau}\left(\frac{\lambda^2 \tau^2 - 2\lambda \tau + 2}{\lambda^3}\right)}$$
+
+Thus, 
+
+$$ \sqrt{n}(VIX(\hat{a}, \hat{\lambda}) - VIX) \sim N\left(0, \triangledown VIX(a, \lambda)^{T} * \Sigma * \triangledown VIX(a, \lambda )\right)$$
+
+where 
+$$ \triangledown VIX = \left[\frac{252}{44*VIX}*e^{\lambda \tau}\left(\frac{\lambda^2 \tau^2 - 2\lambda \tau + 2}{\lambda^3}\right), \frac{a252e^{\lambda \tau}}{44\lambda^3VIX}*\left((\tau - 3/\lambda)(\lambda^2\tau^2 - 2\lambda \tau + 2) + 2\tau(\lambda \tau - 1)\right)\right]$$
+
+
+
+```{r 1e}
+
+vix <- function(a, lambda, tau){
+  sqrt((252/22)*a*exp(lambda * tau)*((lambda^2 * tau^2) - 2*lambda*tau + 2)/(lambda^3)) %>% as.vector()
+}
+
+vix_hat <- vix(coef(nls_reg)[1], coef(nls_reg)[2], -0.15)
+
+grad_vix <- function(a, lambda, tau){
+  vix_hat <- vix(coef(nls_reg)[1], coef(nls_reg)[2], -0.15)
+  
+  return(c((252/44*vix_hat)*exp(lambda * tau)*((lambda^2 * tau^2) - 2*lambda*tau + 2)/(lambda^3), #first element
+    (252*a/(44* lambda^3 *vix_hat))*exp(lambda * tau)*((tau - 3/lambda)*(lambda^2 * tau^2 - 2*lambda*tau + 2) + 2*tau*(lambda*tau - 1))) #second element
+    %>% as.vector())
+}
+
+g <- grad_vix(coef(nls_reg)[1], coef(nls_reg)[2], -0.15)
+
+vix_sd <- sqrt(t(g) %*% bread %*% meat %*% bread %*% g)
+
+vix.ci <- c(vix_hat - qnorm(.975)*vix_sd/sqrt(50), vix_hat + qnorm(0.975)*vix_sd/sqrt(50))
+# includes normalizing constant
+
+
+```
+The point estimate is `r vix_hat` and the confidence interval is ( `r vix.ci` ).
+These numbers are not very close to the actual VIX at all. I assume that is because we restricted our attention to the extreme left tail of the distribution while VIX puts equal weight on all outcomes. 
+
 
