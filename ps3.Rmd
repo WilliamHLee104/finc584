@@ -171,6 +171,8 @@ $$ \triangledown h(\hat{\beta}) = \left( e^{\frac{\sigma^2}{2}}\left( e^{\hat{\b
 
 By the delta method, we have that $$\sqrt(n)(h(\hat{\beta}) - h(\beta)) \rightarrow^{D} N\left(0, \triangledown h(\hat{\beta}) * \Sigma * \triangledown (h(\hat{\beta})^T\right)$$
 
+
+
 ```{r p1d}
 
 e_sigma <- exp(sigma2_hat_full/2)
