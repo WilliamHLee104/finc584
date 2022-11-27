@@ -1,0 +1,72 @@
+---
+title: "finc584_ps7"
+author: "William Lee"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F)
+
+xfun::pkg_attach2('tidyverse', 'readxl', 'sandwich', 'lmtest', 'ivreg', 'knitr')
+
+proj <- dirname(rstudioapi::getSourceEditorContext()$path)
+```
+
+## 1 A
+
+```{r 1a, message = F}
+
+vol <- readxl::read_xlsx(file.path(proj, "volatility.xlsx")) %>% 
+  mutate(log_vol = log(variance), log_vol_demean = log_vol - mean(log_vol))
+
+sample_mean <- mean(vol$log_vol)
+
+sample_covariance_k <- function(k) (nrow(vol) - k)/(nrow(vol) - k - 1)*
+  cov(x = vol$log_vol_demean[(k + 1):nrow(vol)],
+      y = vol$log_vol_demean[1:(nrow(vol) - k)])
+
+phi <- lapply(1:132, sample_covariance_k) %>% unlist()
+
+w <- (1- (1:132)/133)
+
+long_var_nw <- (1/nrow(vol))*(sample_covariance_k(0) + 2*sum(w*phi))
+
+```
+
+
+## 1 B
+
+```{r 1b}
+
+acf_vol <- stats::acf(vol$log_vol_demean,
+                      type = 'covariance', lag.max = 252)
+
+
+```
+
+## 1 C
+
+
+```{r 1c}
+
+epsilon <- rep(NA, nrow(vol))
+epsilon[1:2] <- 0
+kappa <- 0.9751
+mu <- sample_mean
+theta <- -0.1767
+
+logvt_22 <- mu + (kappa^22)*vol$log_vol_demean[1:(nrow(vol)-22)]
+
+data.frame(vol$log_vol[23:nrow(vol)], logvt_22, x = 1:(nrow(vol) -22)) %>% 
+  pivot_longer(cols = -x) %>% 
+  ggplot(aes(x = x, y = value, group = name, color = name)) +
+  geom_line() +
+  theme(legend.position = 'bottom')
+
+
+
+```
+
+
+
